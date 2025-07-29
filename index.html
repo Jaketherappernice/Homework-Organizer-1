@@ -45,7 +45,32 @@
     </div>
   </div>
 
-  <!-- Firebase SDK & logic -->
+  <!-- ✅ Share Modal (Copy to Clipboard) -->
+  <div id="shareModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-xl p-6 w-full max-w-md">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-semibold">Share Homework</h3>
+        <button onclick="closeShareModal()" class="text-gray-500 hover:text-gray-700"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+        <input id="shareSubject" type="text" readonly class="w-full px-3 py-2 border border-gray-300 rounded bg-gray-100">
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Question</label>
+        <textarea id="shareQuestion" rows="3" readonly class="w-full px-3 py-2 border border-gray-300 rounded bg-gray-100"></textarea>
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Answer</label>
+        <textarea id="shareAnswer" rows="5" readonly class="w-full px-3 py-2 border border-gray-300 rounded bg-gray-100"></textarea>
+      </div>
+      <button onclick="copyToClipboard()" class="w-full bg-indigo-600 text-white py-2 px-4 rounded-lg hover:bg-indigo-700 transition-all">
+        <i class="fas fa-copy mr-2"></i> Copy to Clipboard
+      </button>
+    </div>
+  </div>
+
+  <!-- ✅ Firebase + App Logic -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js";
@@ -70,7 +95,6 @@
       measurementId: "G-7T8DZCKC56"
     };
 
-    // ✅ Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const analytics = getAnalytics(app);
     const db = getDatabase(app);
@@ -80,15 +104,15 @@
     const homeworkList = document.getElementById('homeworkList');
     const searchInput = document.getElementById('searchInput');
 
-    // 🔁 Realtime listener
+    // 🔁 Load homework from Firebase
     onValue(homeworkRef, (snapshot) => {
       homeworkList.innerHTML = '';
       const data = snapshot.val();
       if (data) {
         Object.entries(data).forEach(([id, hw]) => {
-          const item = document.createElement('div');
-          item.className = 'bg-white p-4 rounded-lg shadow card-hover transition-all fade-in';
-          item.innerHTML = `
+          const div = document.createElement('div');
+          div.className = 'bg-white p-4 rounded-lg shadow card-hover transition-all fade-in';
+          div.innerHTML = `
             <h3 class="text-lg font-semibold text-indigo-700">${hw.subject}</h3>
             <p class="text-gray-800 mt-2"><strong>Q:</strong> ${hw.question}</p>
             <p class="text-gray-600 mt-1"><strong>A:</strong> ${hw.answer || 'None'}</p>
@@ -96,16 +120,18 @@
               <button class="bg-red-500 text-white px-4 py-1 rounded hover:bg-red-600" onclick="deleteHomework('${id}')">
                 <i class="fas fa-trash"></i> Delete
               </button>
+              <button class="bg-gray-200 text-gray-800 px-4 py-1 rounded hover:bg-gray-300" onclick='showShareModal(${JSON.stringify(hw)})'>
+                <i class="fas fa-share"></i> Share
+              </button>
             </div>
           `;
-          homeworkList.appendChild(item);
+          homeworkList.appendChild(div);
         });
       } else {
         homeworkList.innerHTML = '<p class="text-gray-500 text-center">No homework yet.</p>';
       }
     });
 
-    // ➕ Add new
     homeworkForm.addEventListener('submit', (e) => {
       e.preventDefault();
       const subject = document.getElementById('subject').value.trim();
@@ -120,18 +146,37 @@
       });
     });
 
-    // ❌ Delete
-    window.deleteHomework = function (id) {
+    window.deleteHomework = (id) => {
       remove(ref(db, 'homework/' + id));
     };
 
-    // 🔍 Search
-    window.filterHomeworkItems = function () {
+    window.filterHomeworkItems = () => {
       const term = searchInput.value.toLowerCase();
       const items = homeworkList.querySelectorAll('div');
       items.forEach(div => {
         const text = div.textContent.toLowerCase();
         div.style.display = text.includes(term) ? 'block' : 'none';
+      });
+    };
+
+    window.showShareModal = (hw) => {
+      document.getElementById('shareSubject').value = hw.subject;
+      document.getElementById('shareQuestion').value = hw.question;
+      document.getElementById('shareAnswer').value = hw.answer;
+      document.getElementById('shareModal').classList.remove('hidden');
+    };
+
+    window.closeShareModal = () => {
+      document.getElementById('shareModal').classList.add('hidden');
+    };
+
+    window.copyToClipboard = () => {
+      const subject = document.getElementById('shareSubject').value;
+      const question = document.getElementById('shareQuestion').value;
+      const answer = document.getElementById('shareAnswer').value;
+      const text = `Subject: ${subject}\n\nQuestion: ${question}\n\nAnswer: ${answer}`;
+      navigator.clipboard.writeText(text).then(() => {
+        alert("Copied to clipboard!");
       });
     };
   </script>
