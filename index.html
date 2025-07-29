@@ -103,123 +103,121 @@
       projectId: "apollo-hub-26dac",
       storageBucket: "apollo-hub-26dac.appspot.com",
       messagingSenderId: "473334990651",
-      appId: "1:473334990651:web:b615a8672a9b737655d91e",
-      measurementId: "G-L95723V67X"
+      appId: "1:473334990651:web:b615a8672a9b737655d91e"
     };
 
-    const app = firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+    if (typeof firebase === "undefined") {
+      console.error("❌ Firebase SDK failed to load.");
+    } else {
+      firebase.initializeApp(firebaseConfig);
+      const db = firebase.database();
+      console.log("✅ Firebase initialized");
 
-    document.addEventListener("DOMContentLoaded", function () {
-      loadHomeworkItems();
-      document.getElementById("homeworkForm").addEventListener("submit", function (e) {
-        e.preventDefault();
-        addHomeworkItem();
-      });
-    });
+      document.addEventListener("DOMContentLoaded", function () {
+        console.log("📦 DOM ready");
 
-    function loadHomeworkItems() {
-      const list = document.getElementById("homeworkItemsContainer");
-      const noHomework = document.getElementById("noHomework");
+        const list = document.getElementById("homeworkItemsContainer");
+        const noHomework = document.getElementById("noHomework");
 
-      db.ref("homework").on("value", (snapshot) => {
-        const data = snapshot.val() || {};
-        list.innerHTML = "";
+        // Load data
+        db.ref("homework").on("value", (snapshot) => {
+          const data = snapshot.val() || {};
+          list.innerHTML = "";
 
-        const entries = Object.entries(data);
-        if (entries.length === 0) {
-          noHomework.classList.remove("hidden");
-        } else {
-          noHomework.classList.add("hidden");
-        }
+          const entries = Object.entries(data);
+          noHomework.classList.toggle("hidden", entries.length > 0);
 
-        entries.reverse().forEach(([key, item]) => {
-          const el = createHomeworkItemElement(item, key);
-          list.appendChild(el);
+          entries.reverse().forEach(([key, item]) => {
+            const el = document.createElement("div");
+            el.className = "homework-item bg-white rounded-xl shadow-md p-5 fade-in card-hover transition-all";
+            el.innerHTML = `
+              <div class="flex justify-between items-start mb-2">
+                <span class="bg-indigo-100 text-indigo-800 text-xs font-semibold px-2.5 py-0.5 rounded">${item.subject}</span>
+                <div class="flex space-x-2">
+                  <button onclick="shareHomeworkItem('${key}')" class="text-gray-500 hover:text-indigo-600 transition-all" title="Share">
+                    <i class="fas fa-share-alt"></i>
+                  </button>
+                  <button onclick="deleteHomeworkItem('${key}')" class="text-gray-500 hover:text-red-600 transition-all" title="Delete">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </div>
+              </div>
+              <h3 class="text-lg font-semibold text-gray-800 mb-1">${item.question}</h3>
+              <p class="text-gray-600 whitespace-pre-line">${item.answer || "No answer provided yet."}</p>
+            `;
+            list.appendChild(el);
+          });
+
+          filterHomeworkItems();
         });
 
-        filterHomeworkItems();
+        // Form submit
+        document.getElementById("homeworkForm").addEventListener("submit", function (e) {
+          e.preventDefault();
+          const subject = document.getElementById("subject").value.trim();
+          const question = document.getElementById("question").value.trim();
+          const answer = document.getElementById("answer").value.trim();
+
+          if (!subject || !question) {
+            alert("Subject and Question are required!");
+            return;
+          }
+
+          const newRef = db.ref("homework").push();
+          newRef.set({ subject, question, answer })
+            .then(() => {
+              console.log("✅ Homework added");
+              document.getElementById("homeworkForm").reset();
+            })
+            .catch((err) => {
+              console.error("🔥 Failed to add:", err);
+              alert("Firebase write failed: " + err.message);
+            });
+        });
       });
-    }
 
-    function createHomeworkItemElement(item, key) {
-      const el = document.createElement("div");
-      el.className = "homework-item bg-white rounded-xl shadow-md p-5 fade-in card-hover transition-all";
-      el.innerHTML = `
-        <div class="flex justify-between items-start mb-2">
-          <span class="bg-indigo-100 text-indigo-800 text-xs font-semibold px-2.5 py-0.5 rounded">${item.subject}</span>
-          <div class="flex space-x-2">
-            <button onclick="shareHomeworkItem('${key}')" class="text-gray-500 hover:text-indigo-600 transition-all" title="Share">
-              <i class="fas fa-share-alt"></i>
-            </button>
-            <button onclick="deleteHomeworkItem('${key}')" class="text-gray-500 hover:text-red-600 transition-all" title="Delete">
-              <i class="fas fa-trash"></i>
-            </button>
-          </div>
-        </div>
-        <h3 class="text-lg font-semibold text-gray-800 mb-1">${item.question}</h3>
-        <p class="text-gray-600 whitespace-pre-line">${item.answer || "No answer provided yet."}</p>
-      `;
-      return el;
-    }
-
-    function addHomeworkItem() {
-      const subject = document.getElementById("subject").value.trim();
-      const question = document.getElementById("question").value.trim();
-      const answer = document.getElementById("answer").value.trim();
-
-      if (!subject || !question) {
-        alert("Subject and Question are required!");
-        return;
-      }
-
-      const newRef = db.ref("homework").push();
-      newRef.set({ subject, question, answer });
-
-      document.getElementById("homeworkForm").reset();
-    }
-
-    function deleteHomeworkItem(key) {
-      if (confirm("Are you sure you want to delete this homework item?")) {
-        db.ref("homework/" + key).remove();
-      }
-    }
-
-    function shareHomeworkItem(key) {
-      db.ref("homework/" + key).once("value", snapshot => {
-        const item = snapshot.val();
-        if (item) {
-          document.getElementById("shareSubject").value = item.subject;
-          document.getElementById("shareQuestion").value = item.question;
-          document.getElementById("shareAnswer").value = item.answer;
-          document.getElementById("shareModal").classList.remove("hidden");
+      window.deleteHomeworkItem = function (key) {
+        if (confirm("Are you sure you want to delete this homework item?")) {
+          db.ref("homework/" + key).remove();
         }
-      });
-    }
+      };
 
-    function closeShareModal() {
-      document.getElementById("shareModal").classList.add("hidden");
-    }
+      window.shareHomeworkItem = function (key) {
+        db.ref("homework/" + key).once("value").then(snapshot => {
+          const item = snapshot.val();
+          if (item) {
+            document.getElementById("shareSubject").value = item.subject;
+            document.getElementById("shareQuestion").value = item.question;
+            document.getElementById("shareAnswer").value = item.answer;
+            document.getElementById("shareModal").classList.remove("hidden");
+          }
+        });
+      };
 
-    function copyToClipboard() {
-      const subject = document.getElementById("shareSubject").value;
-      const question = document.getElementById("shareQuestion").value;
-      const answer = document.getElementById("shareAnswer").value;
-      const text = `Subject: ${subject}\n\nQuestion:\n${question}\n\nAnswer:\n${answer}`;
-      navigator.clipboard.writeText(text).then(() => {
-        alert("Copied to clipboard!");
-        closeShareModal();
-      }).catch(err => {
-        alert("Copy failed: " + err);
-      });
-    }
+      window.closeShareModal = function () {
+        document.getElementById("shareModal").classList.add("hidden");
+      };
 
-    function filterHomeworkItems() {
-      const query = document.getElementById("searchInput").value.toLowerCase();
-      document.querySelectorAll(".homework-item").forEach(item => {
-        item.style.display = item.innerText.toLowerCase().includes(query) ? "" : "none";
-      });
+      window.copyToClipboard = function () {
+        const subject = document.getElementById("shareSubject").value;
+        const question = document.getElementById("shareQuestion").value;
+        const answer = document.getElementById("shareAnswer").value;
+        const text = `Subject: ${subject}\n\nQuestion:\n${question}\n\nAnswer:\n${answer}`;
+        navigator.clipboard.writeText(text).then(() => {
+          alert("Copied to clipboard!");
+          closeShareModal();
+        }).catch(err => {
+          alert("Copy failed: " + err.message);
+        });
+      };
+
+      window.filterHomeworkItems = function () {
+        const query = document.getElementById("searchInput").value.toLowerCase();
+        document.querySelectorAll(".homework-item").forEach(item => {
+          item.style.display = item.innerText.toLowerCase().includes(query) ? "" : "none";
+        });
+      };
     }
   </script>
 </body>
-  </html>
+</html>
